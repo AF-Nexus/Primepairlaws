@@ -6,7 +6,11 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "build": "npm install && mkdir -p public sessions",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "clean": "rm -rf sessions/* node_modules",
+    "install-deps": "npm install"
   },
   "keywords": [
     "whatsapp-bot",
@@ -21,7 +25,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "latest",
+    "baileys": "latest",
     "express": "^4.18.2",
     "cors": "^2.8.5",
     "axios": "^1.6.0",
@@ -31,5 +35,13 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-username/ef-prime-session-generator.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/ef-prime-session-generator/issues"
+  },
+  "homepage": "https://github.com/your-username/ef-prime-session-generator#readme"
 }
