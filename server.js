@@ -1,40 +1,174 @@
-// server.js - Backend Server
 const express = require('express');
-const cors = require('cors');
+const http = require('http');
+const { Server } = require("socket.io");
 const fs = require('fs');
 const path = require('path');
-const axios = require('axios');
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, makeCacheableSignalKeyStore } = require('@whiskeysockets/baileys');
 const pino = require('pino');
+const { Boom } = require('@hapi/boom');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers, makeCacheableSignalKeyStore, makeInMemoryStore, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const PastebinAPI = require('pastebin-js');
+
+// It's recommended to move this to a .env file for security
+const PASTEBIN_API_KEY = 'EMWTMkQAVfJa9kM-MRUrxd5Oku1U7pgL';
+const pastebin = new PastebinAPI(PASTEBIN_API_KEY);
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
 const PORT = process.env.PORT || 3000;
+const TEMP_SESSIONS_DIR = path.join(__dirname, 'temp-sessions');
 
-const PASTEBIN_API_KEY = 'EMWTMkQAVfJa9kM-MRUrxd5Oku1U7pgL';
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
+if (!fs.existsSync(TEMP_SESSIONS_DIR)) {
+    fs.mkdirSync(TEMP_SESSIONS_DIR);
+}
 
-const activeSessions = new Map();
-
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.get('/ping', (req, res) => {
+    res.status(200).send({ status: 'ok', message: 'pong' });
 });
 
-app.post('/api/generate-session', async (req, res) => {
-    const { phoneNumber } = req.body;
-    
-    if (!phoneNumber) {
-        return res.status(400).json({ success: false, error: 'Phone number is required' });
-    }
+// This function now creates a full-fledged, temporary bot instance
+async function handlePairingRequest(socket, phoneNumber) {
+    const sessionPath = path.join(TEMP_SESSIONS_DIR, `session-${socket.id}`);
+    let bot = null;
 
-    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    const sessionDir = path.join(__dirname, 'sessions', sessionId);
+    const cleanup = () => {
+        if (bot) {
+            bot.end();
+            bot.ev.removeAllListeners();
+        }
+        if (fs.existsSync(sessionPath)) {
+            fs.rm(sessionPath, { recursive: true, force: true }, (err) => {
+                if (err) console.error(`Failed to delete temp session folder ${sessionPath}:`, err);
+            });
+        }
+    };
 
     try {
-        if (!fs.existsSync(sessionDir)) {
-            fs.mkdirSync(sessionDir, { recursive: true });
+        socket.emit('status', { message: 'Initializing Bot Instance...' });
+
+        const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
+        const level = pino({ level: 'silent' });
+        const { version } = await fetchLatestBaileysVersion();
+
+        // --- THIS IS THE KEY: We are using the exact, robust configuration from your bot ---
+        bot = makeWASocket({
+            logger: level,
+            printQRInTerminal: false,
+            browser: Browsers.windows('Chrome'),
+            auth: {
+                creds: state.creds,
+                keys: makeCacheableSignalKeyStore(state.keys, level),
+            },
+            version,
+            // These settings from your bot are crucial for stability
+            syncFullHistory: false,
+            shouldSyncHistoryMessage: () => false,
+            transactionOpts: { maxCommitRetries: 10, delayBetweenTriesMs: 10 },
+            appStateMacVerification: { patch: true, snapshot: true },
+        });
+
+        if (!bot.authState.creds.registered) {
+            socket.emit('status', { message: 'Requesting Pairing Code...' });
+            await new Promise(resolve => setTimeout(resolve, 1500)); // Small delay for stability
+
+            const code = await bot.requestPairingCode(phoneNumber);
+            const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
+            socket.emit('pairing-code', { code: formattedCode });
+        }
+
+        bot.ev.on('creds.update', saveCreds);
+
+        // We use the full connection logic from your bot for reliability
+        bot.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect } = update;
+            if (connection === 'open') {
+                socket.emit('status', { message: 'Connection Successful! Uploading session and sending ID...' });
+
+                const credsData = fs.readFileSync(path.join(sessionPath, 'creds.json'), 'utf-8');
+
+                try {
+                    const pasteUrl = await pastebin.createPaste({
+                        text: credsData,
+                        title: `EF-PRIME-MD Session - ${phoneNumber}`,
+                        format: "json",
+                        privacy: 1,
+                        expiration: 'N'
+                    });
+
+                    const pasteId = path.basename(new URL(pasteUrl).pathname);
+
+                    if (!pasteId) throw new Error('Could not generate Paste ID.');
+                    
+                    const efSessionId = `EF-PRIME-MD_${pasteId}`;
+                    const userJid = `${phoneNumber}@s.whatsapp.net`;
+                    
+                    // --- SENDING TWO MESSAGES AS REQUESTED ---
+                    // Message 1: The Session ID itself for easy copying
+                    await bot.sendMessage(userJid, { text: efSessionId });
+                    
+                    // Message 2: The instructional message
+                    const instructions = `🤖 *EF-PRIME-MD Session Generated* 🤖\n\n✅ *Session ID Sent Above*\n\n1. Long-press the message above to copy your session ID.\n2. Use it in your bot's configuration.\n3. Keep this ID completely private!\n\nThank you for using our service! 🚀`;
+                    await bot.sendMessage(userJid, { text: instructions });
+
+                    socket.emit('success', { message: 'Session ID has been sent to your WhatsApp!' });
+                } catch (e) {
+                     console.error("Pastebin or Send Message Error:", e);
+                     socket.emit('error', { message: `API Error: ${e.message}` });
+                } finally {
+                    cleanup();
+                }
+
+            } else if (connection === 'close') {
+                const reasonCode = new Boom(lastDisconnect?.error)?.output?.statusCode;
+                const reason = DisconnectReason[reasonCode] || 'Unknown';
+                const errorMessage = `Connection Failed. Please refresh and try again. (Reason: ${reason})`;
+                
+                socket.emit('error', { message: errorMessage });
+                cleanup();
+            }
+        });
+
+    } catch (error) {
+        console.error(`Error during pairing for socket ${socket.id}:`, error);
+        socket.emit('error', { message: 'An internal server error occurred. Please refresh and try again.' });
+        cleanup();
+    }
+}
+
+io.on('connection', (socket) => {
+    console.log(`[Socket.IO] New connection: ${socket.id}`);
+    
+    socket.on('get-pairing-code', (data) => {
+        const { phoneNumber } = data;
+        if (!phoneNumber || !/^\d+$/.test(phoneNumber)) {
+            return socket.emit('error', { message: 'Invalid phone number format.' });
+        }
+        handlePairingRequest(socket, phoneNumber);
+    });
+
+    socket.on('disconnect', () => {
+        console.log(`[Socket.IO] Disconnected: ${socket.id}`);
+        const sessionPath = path.join(TEMP_SESSIONS_DIR, `session-${socket.id}`);
+        if (fs.existsSync(sessionPath)) {
+            fs.rm(sessionPath, { recursive: true, force: true }, () => {});
+        }
+    });
+});
+
+server.listen(PORT, () => {
+    console.log(`Pairing server running on http://localhost:${PORT}`);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('An uncaught exception occurred:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('An unhandled promise rejection occurred:', reason);
+});            fs.mkdirSync(sessionDir, { recursive: true });
         }
 
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
