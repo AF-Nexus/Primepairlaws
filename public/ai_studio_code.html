@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EF-PRIME-MD Session Generator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; position: relative; overflow: hidden; }
+        body::before { content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%), radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.3) 0%, transparent 50%); z-index: -1; animation: float 6s ease-in-out infinite; }
+        @keyframes float { 0%, 100% { transform: translateY(0px) rotate(0deg); } 33% { transform: translateY(-10px) rotate(1deg); } 66% { transform: translateY(5px) rotate(-1deg); } }
+        .container { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px); border-radius: 25px; padding: 50px 40px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.2); max-width: 500px; width: 100%; text-align: center; position: relative; animation: slideIn 0.8s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        .logo { font-size: 2.8rem; font-weight: bold; background: linear-gradient(135deg, #fff 0%, #e0e0e0 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 10px; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3); position: relative; }
+        .logo::after { content: '🚀'; position: absolute; top: -10px; right: -30px; font-size: 1.5rem; animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } 60% { transform: translateY(-5px); } }
+        .subtitle { color: rgba(255, 255, 255, 0.9); margin-bottom: 40px; font-size: 1.1rem; font-weight: 300; }
+        .input-group { margin-bottom: 30px; text-align: left; position: relative; }
+        .input-group label { display: block; color: #fff; margin-bottom: 10px; font-weight: 600; font-size: 0.95rem; }
+        .input-group input { width: 100%; padding: 18px 20px; border: none; border-radius: 15px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(10px); color: #fff; font-size: 1rem; border: 2px solid rgba(255, 255, 255, 0.2); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
+        .input-group input::placeholder { color: rgba(255, 255, 255, 0.6); }
+        .input-group input:focus { outline: none; border-color: #4CAF50; box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.2), 0 0 20px rgba(76, 175, 80, 0.3); transform: translateY(-2px); }
+        .btn { width: 100%; padding: 18px; border: none; border-radius: 15px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); margin-bottom: 20px; position: relative; overflow: hidden; }
+        .btn::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent); transition: left 0.5s; }
+        .btn:hover::before { left: 100%; }
+        .btn-primary { background: linear-gradient(135deg, #4CAF50 0%, #45a049 50%, #3e8e41 100%); color: white; box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4); border: 2px solid rgba(255, 255, 255, 0.2); }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 12px 35px rgba(76, 175, 80, 0.5); }
+        .btn-primary:active:not(:disabled) { transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.7; cursor: not-allowed; transform: none !important; }
+        .status { padding: 20px; border-radius: 15px; margin-top: 25px; font-weight: 500; display: none; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); animation: statusSlide 0.5s ease-out; }
+        @keyframes statusSlide { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+        .status.success { background: rgba(76, 175, 80, 0.2); color: #4CAF50; border-color: rgba(76, 175, 80, 0.4); }
+        .status.error { background: rgba(244, 67, 54, 0.2); color: #f44336; border-color: rgba(244, 67, 54, 0.4); }
+        .status.warning { background: rgba(255, 193, 7, 0.2); color: #FFC107; border-color: rgba(255, 193, 7, 0.4); }
+        .pairing-code { background: rgba(0, 0, 0, 0.4); color: #4CAF50; padding: 25px; border-radius: 15px; margin: 25px 0; font-family: 'Courier New', monospace; font-size: 1.8rem; font-weight: bold; letter-spacing: 3px; border: 2px solid #4CAF50; display: none; position: relative; backdrop-filter: blur(10px); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.4); } 50% { box-shadow: 0 0 30px rgba(76, 175, 80, 0.6); } }
+        .pairing-code::before { content: '🔐'; position: absolute; top: 10px; right: 15px; font-size: 1.2rem; }
+        .instructions { background: rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 25px; margin-top: 25px; text-align: left; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); }
+        .instructions h3 { color: #fff; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .instructions h3::before { content: '📋'; font-size: 1.2rem; }
+        .instructions ol { color: rgba(255, 255, 255, 0.9); padding-left: 25px; }
+        .instructions li { margin-bottom: 12px; line-height: 1.6; position: relative; }
+        .spinner { width: 20px; height: 20px; border: 3px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top-color: #4CAF50; animation: spin 1s linear infinite; display: inline-block; margin-right: 10px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .footer { margin-top: 35px; color: rgba(255, 255, 255, 0.7); font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .footer::before { content: '⚡'; }
+        .progress-bar { width: 100%; height: 4px; background: rgba(255, 255, 255, 0.2); border-radius: 2px; margin: 20px 0; overflow: hidden; display: none; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #4CAF50, #45a049); border-radius: 2px; width: 0%; transition: width 0.3s ease; }
+        @media (max-width: 600px) { .container { padding: 40px 25px; margin: 10px; border-radius: 20px; } .logo { font-size: 2.2rem; } .pairing-code { font-size: 1.4rem; letter-spacing: 2px; padding: 20px; } }
+        .warning-banner { background: rgba(255, 152, 0, 0.2); color: #FF9800; padding: 15px; border-radius: 10px; margin-bottom: 25px; border: 1px solid rgba(255, 152, 0, 0.3); display: flex; align-items: center; gap: 10px; font-size: 0.9rem; }
+        .warning-banner::before { content: '⚠️'; font-size: 1.2rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">EF-PRIME-MD</div>
+        <div class="subtitle">Ultra Session Generator</div>
+        <div class="warning-banner"><span>Only use your own WhatsApp number. Never share your session ID with anyone!</span></div>
+        <form id="sessionForm"><div class="input-group"><label for="phoneNumber">WhatsApp Number</label><input type="tel" id="phoneNumber" placeholder="e.g., +1234567890" required></div><button type="submit" class="btn btn-primary" id="generateBtn">🚀 Generate Session ID</button></form>
+        <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="pairing-code" id="pairingCode"></div>
+        <div class="status" id="status"></div>
+        <div class="instructions"><h3>How to Use:</h3><ol><li>Enter your WhatsApp number with country code (e.g., +1234567890)</li><li>Click "Generate Session ID" to start the pairing process</li><li>Open WhatsApp → Settings → Linked Devices → Link a Device</li><li>Enter the pairing code shown below when prompted</li><li>Your session ID will be automatically sent to your WhatsApp</li><li>Use the session ID to deploy your EF-PRIME-MD bot</li></ol></div>
+        <div class="footer">Secure • Fast • Reliable</div>
+    </div>
+    <script>
+        class SessionGenerator {
+            constructor() { this.form = document.getElementById('sessionForm'); this.phoneInput = document.getElementById('phoneNumber'); this.generateBtn = document.getElementById('generateBtn'); this.pairingCodeDiv = document.getElementById('pairingCode'); this.statusDiv = document.getElementById('status'); this.progressBar = document.getElementById('progressBar'); this.progressFill = document.getElementById('progressFill'); this.currentSessionId = null; this.bindEvents(); }
+            bindEvents() { this.form.addEventListener('submit', (e) => { e.preventDefault(); this.handleGenerate(); }); this.phoneInput.addEventListener('input', (e) => { let value = e.target.value.replace(/\D/g, ''); if (value.length > 0 && !value.startsWith('+')) { e.target.value = '+' + value; } }); }
+            showStatus(message, type = 'success') { this.statusDiv.innerHTML = message; this.statusDiv.className = `status ${type}`; this.statusDiv.style.display = 'block'; }
+            showPairingCode(code) { this.pairingCodeDiv.innerHTML = `<strong>Pairing Code:</strong><br>${code}`; this.pairingCodeDiv.style.display = 'block'; }
+            hidePairingCode() { this.pairingCodeDiv.style.display = 'none'; }
+            showProgress(show = true) { this.progressBar.style.display = show ? 'block' : 'none'; if (!show) { this.progressFill.style.width = '0%'; } }
+            updateProgress(percentage) { this.progressFill.style.width = percentage + '%'; }
+            setLoading(loading) { if (loading) { this.generateBtn.innerHTML = '<div class="spinner"></div>Processing...'; this.generateBtn.disabled = true; } else { this.generateBtn.innerHTML = '🚀 Generate Session ID'; this.generateBtn.disabled = false; } }
+            async handleGenerate() {
+                const phoneNumber = this.phoneInput.value.trim();
+                if (!phoneNumber) { this.showStatus('❌ Please enter your WhatsApp number', 'error'); return; }
+                if (!phoneNumber.startsWith('+') || phoneNumber.length < 10) { this.showStatus('❌ Please enter a valid phone number with country code (e.g., +1234567890)', 'error'); return; }
+                this.setLoading(true); this.hidePairingCode(); this.showProgress(true); this.updateProgress(10);
+                try {
+                    this.showStatus('🔄 Connecting to WhatsApp servers...', 'warning'); this.updateProgress(25);
+                    const response = await fetch('/api/generate-session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phoneNumber }) });
+                    const data = await response.json(); this.updateProgress(50);
+                    if (!data.success) { throw new Error(data.error || 'Failed to generate session'); }
+                    this.currentSessionId = data.sessionId; this.showPairingCode(data.pairingCode); this.showStatus('✅ Pairing code generated! Please enter it in WhatsApp:<br><strong>Settings → Linked Devices → Link a Device</strong>', 'success'); this.updateProgress(75);
+                    this.showStatus('⏳ Waiting for you to enter the pairing code in WhatsApp...', 'warning');
+                    await this.waitForPairing();
+                } catch (error) { console.error('Error:', error); this.showStatus(`❌ Error: ${error.message}`, 'error'); this.hidePairingCode(); this.showProgress(false); } finally { this.setLoading(false); }
+            }
+            async waitForPairing() {
+                const maxAttempts = 60; let attempts = 0;
+                const checkStatus = async () => {
+                    try {
+                        const response = await fetch(`/api/session-status/${this.currentSessionId}`); const data = await response.json();
+                        if (data.status === 'paired') { this.updateProgress(100); this.showStatus('🎉 Session generated successfully! Check your WhatsApp for the session ID.', 'success'); this.hidePairingCode(); setTimeout(() => { this.showProgress(false); }, 3000); return true; }
+                        else if (data.status === 'not_found') { throw new Error('Session expired or not found'); }
+                        attempts++; if (attempts >= maxAttempts) { throw new Error('Pairing timeout. Please try again.'); }
+                        setTimeout(checkStatus, 5000); return false;
+                    } catch (error) { throw error; }
+                };
+                await checkStatus();
+            }
+        }
+        document.addEventListener('DOMContentLoaded', () => { new SessionGenerator(); });
+        document.addEventListener('mousemove', (e) => { const x = e.clientX / window.innerWidth; const y = e.clientY / window.innerHeight; document.body.style.background = `linear-gradient(135deg, hsl(${240 + x * 30}, 70%, ${60 + y * 10}%) 0%, hsl(${270 + x * 20}, 60%, ${50 + y * 15}%) 100%)`; });
+        function createParticle() { const particle = document.createElement('div'); particle.style.cssText = `position: fixed; width: 4px; height: 4px; background: rgba(255, 255, 255, 0.6); border-radius: 50%; pointer-events: none; z-index: -1; animation: float-particle 8s linear infinite;`; particle.style.left = Math.random() * 100 + 'vw'; particle.style.animationDelay = Math.random() * 8 + 's'; document.body.appendChild(particle); setTimeout(() => { particle.remove(); }, 8000); }
+        const style = document.createElement('style'); style.textContent = `@keyframes float-particle { 0% { transform: translateY(100vh) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-100vh) rotate(360deg); opacity: 0; } }`; document.head.appendChild(style);
+        setInterval(createParticle, 500);
+    </script>
+</body>
+</html>
